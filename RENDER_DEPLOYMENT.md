@@ -94,3 +94,7 @@ After deployment, your service will be available at:
 - Implement model caching strategies
 - Consider upgrading to paid tier for better performance
 - Add monitoring and alerting
+
+## Deployment Notes
+- Updated to Python 3.10.12 for TensorFlow 2.13 compatibility
+- Last updated: 2024-12-19
