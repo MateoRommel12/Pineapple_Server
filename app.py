@@ -10,8 +10,16 @@ import warnings
 # Fix NumPy 2.x compatibility with TensorFlow
 import numpy as np
 # Suppress NumPy 2.x warnings for TensorFlow compatibility
-warnings.filterwarnings('ignore', category=np.VisibleDeprecationWarning)
+try:
+    # NumPy 1.x has VisibleDeprecationWarning
+    warnings.filterwarnings('ignore', category=np.VisibleDeprecationWarning)
+except AttributeError:
+    # NumPy 2.x doesn't have VisibleDeprecationWarning, use generic warning suppression
+    pass
+
 warnings.filterwarnings('ignore', message='.*__firstlineno__.*')
+warnings.filterwarnings('ignore', category=FutureWarning)
+warnings.filterwarnings('ignore', category=UserWarning, message='.*canonical symbol.*')
 
 from PIL import Image
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends
