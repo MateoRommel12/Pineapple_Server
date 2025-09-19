@@ -64,19 +64,10 @@ class KerasClassifier:
         if not (os.path.exists(model_path) or os.path.isdir(model_path)):
             raise RuntimeError(f"Model file not found at: {model_path}")
         try:
-            # Try tf.keras first (disable safe mode to relax deserialization constraints)
-            self.model = tf.keras.models.load_model(model_path, compile=False, safe_mode=False)
-        except Exception as e1:
-            # Fallback to standalone keras (Keras 3) if present
-            try:
-                import keras  # type: ignore
-                self.model = keras.models.load_model(model_path, compile=False, safe_mode=False)
-            except Exception as e2:
-                raise RuntimeError(
-                    f"Failed to load model at {model_path}.\n"
-                    f"tf.keras error: {e1}\n"
-                    f"keras error: {e2}"
-                )
+            # TensorFlow 2.13 includes Keras - use tf.keras
+            self.model = tf.keras.models.load_model(model_path, compile=False)
+        except Exception as e:
+            raise RuntimeError(f"Failed to load model at {model_path}: {e}")
             
         self.class_names = class_names
         self.input_size = input_size
