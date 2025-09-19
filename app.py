@@ -5,13 +5,24 @@ import uuid
 import datetime
 from io import BytesIO
 from typing import Dict, Any, List
+import warnings
 
+# Fix NumPy 2.x compatibility with TensorFlow
 import numpy as np
+# Suppress NumPy 2.x warnings for TensorFlow compatibility
+warnings.filterwarnings('ignore', category=np.VisibleDeprecationWarning)
+warnings.filterwarnings('ignore', message='.*__firstlineno__.*')
+
 from PIL import Image
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Boolean
 from sqlalchemy.orm import sessionmaker, declarative_base, Session
+
+# Set TensorFlow environment for NumPy 2.x compatibility
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
+
 import tensorflow as tf
 
 # ---------------- Config ----------------
@@ -64,10 +75,19 @@ class KerasClassifier:
         if not (os.path.exists(model_path) or os.path.isdir(model_path)):
             raise RuntimeError(f"Model file not found at: {model_path}")
         try:
-            # TensorFlow 2.13 includes Keras - use tf.keras
-            self.model = tf.keras.models.load_model(model_path, compile=False)
+            # TensorFlow 2.20 with NumPy 2.x compatibility
+            # Temporarily suppress NumPy warnings during model loading
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                self.model = tf.keras.models.load_model(model_path, compile=False)
         except Exception as e:
-            raise RuntimeError(f"Failed to load model at {model_path}: {e}")
+            # If loading fails due to NumPy compatibility, try with safe_mode=False
+            try:
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    self.model = tf.keras.models.load_model(model_path, compile=False, safe_mode=False)
+            except Exception as e2:
+                raise RuntimeError(f"Failed to load model at {model_path}. Primary error: {e}. Fallback error: {e2}")
             
         self.class_names = class_names
         self.input_size = input_size
