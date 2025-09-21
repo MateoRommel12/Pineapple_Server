@@ -72,30 +72,15 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
 # Critical fix for NumPy 2.x compatibility
 os.environ['TF_USE_LEGACY_KERAS'] = '1'
+# Suppress TensorFlow warnings
+os.environ['TF_ENABLE_DEPRECATION_WARNINGS'] = '0'
 
 import tensorflow as tf
 
-# Additional NumPy 2.x compatibility fixes
-try:
-    # Monkey patch to prevent the __firstlineno__ error
-    import numpy as np
-    if hasattr(np, '__version__') and np.__version__.startswith('2.'):
-        # For NumPy 2.x, we need to handle symbol replacement differently
-        original_setattr = object.__setattr__
-        
-        def patched_setattr(obj, name, value):
-            if name == '__firstlineno__' and hasattr(obj, '__firstlineno__'):
-                # Skip the problematic __firstlineno__ replacement
-                return
-            return original_setattr(obj, name, value)
-        
-        # Apply the patch temporarily during imports
-        import builtins
-        if not hasattr(builtins, '_numpy_patch_applied'):
-            builtins._numpy_patch_applied = True
-except Exception:
-    # If patching fails, continue normally
-    pass
+# Disable TensorFlow warnings and info messages
+tf.get_logger().setLevel('ERROR')
+warnings.filterwarnings('ignore', category=FutureWarning, module='tensorflow')
+warnings.filterwarnings('ignore', message='.*deprecated.*')
 
 # ---------------- Config ----------------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -146,50 +131,23 @@ class KerasClassifier:
     def __init__(self, model_path: str, class_names: List[str], input_size=(224, 224)):
         if not (os.path.exists(model_path) or os.path.isdir(model_path)):
             raise RuntimeError(f"Model file not found at: {model_path}")
-        # Multiple fallback strategies for NumPy 2.x compatibility
-        model_loaded = False
-        last_error = None
-        
-        # Strategy 1: Standard loading with warnings suppressed
+        # Simplified model loading for better compatibility
         try:
+            # First attempt: Standard loading with warnings suppressed
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
                 self.model = tf.keras.models.load_model(model_path, compile=False)
-                model_loaded = True
+                print("✅ Model loaded successfully")
         except Exception as e:
-            last_error = e
-            print(f"⚠️ Strategy 1 failed: {e}")
-        
-        # Strategy 2: Loading with safe_mode=False
-        if not model_loaded:
+            print(f"⚠️ Standard loading failed: {e}")
             try:
+                # Fallback: Use safe_mode=False to handle compatibility issues
                 with warnings.catch_warnings():
                     warnings.simplefilter("ignore")
                     self.model = tf.keras.models.load_model(model_path, compile=False, safe_mode=False)
-                    model_loaded = True
                     print("✅ Model loaded with safe_mode=False")
-            except Exception as e:
-                last_error = e
-                print(f"⚠️ Strategy 2 failed: {e}")
-        
-        # Strategy 3: Force TensorFlow 2.x legacy mode
-        if not model_loaded:
-            try:
-                # Try with explicit legacy Keras
-                import tensorflow.compat.v1 as tf1
-                tf1.disable_v2_behavior()
-                with warnings.catch_warnings():
-                    warnings.simplefilter("ignore")
-                    self.model = tf.keras.models.load_model(model_path, compile=False)
-                    model_loaded = True
-                    print("✅ Model loaded with TF legacy mode")
-                tf1.enable_v2_behavior()  # Re-enable v2 behavior
-            except Exception as e:
-                last_error = e
-                print(f"⚠️ Strategy 3 failed: {e}")
-        
-        if not model_loaded:
-            raise RuntimeError(f"Failed to load model at {model_path} after all strategies. Last error: {last_error}")
+            except Exception as e2:
+                raise RuntimeError(f"Failed to load model at {model_path}. Standard error: {e}. Fallback error: {e2}")
             
         self.class_names = class_names
         self.input_size = input_size
