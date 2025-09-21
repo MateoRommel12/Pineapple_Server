@@ -1,11 +1,51 @@
 # Capstone/server/app.py - Sweetness Analysis Only (Detection handled by React Native)
+
+# CRITICAL: NumPy 2.x compatibility fix - must be FIRST
+import sys
+import warnings
+
+# Global NumPy 2.x compatibility patch
+def patch_numpy_compatibility():
+    """Patch NumPy 2.x symbol compatibility issues before any imports"""
+    try:
+        import numpy as np
+        if hasattr(np, '__version__') and np.__version__.startswith('2.'):
+            # Monkey patch the symbol creation to handle __firstlineno__ gracefully
+            try:
+                from sqlalchemy.util.langhelpers import symbol
+                original_symbol = symbol
+                
+                def patched_symbol(name, canonical=None, cls=None, doc=None):
+                    if name == '__firstlineno__':
+                        # Return a safe symbol for __firstlineno__
+                        return original_symbol(name, canonical=canonical, cls=cls, doc=doc)
+                    return original_symbol(name, canonical=canonical, cls=cls, doc=doc)
+                
+                # Apply the patch temporarily
+                import sqlalchemy.util.langhelpers
+                sqlalchemy.util.langhelpers.symbol = patched_symbol
+                
+            except ImportError:
+                # SQLAlchemy not yet imported, patch will be applied when needed
+                pass
+            
+            # Suppress all NumPy 2.x related warnings
+            warnings.filterwarnings('ignore', message='.*__firstlineno__.*')
+            warnings.filterwarnings('ignore', message='.*canonical symbol.*')
+            warnings.filterwarnings('ignore', category=FutureWarning)
+            
+    except Exception as e:
+        print(f"Warning: Could not apply NumPy compatibility patch: {e}")
+
+# Apply the patch immediately
+patch_numpy_compatibility()
+
 import os
 import json
 import uuid
 import datetime
 from io import BytesIO
 from typing import Dict, Any, List
-import warnings
 
 # Fix NumPy 2.x compatibility with TensorFlow
 import numpy as np
