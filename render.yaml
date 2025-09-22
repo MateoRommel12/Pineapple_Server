@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: pineapple-server
+    env: python
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.0
+      - key: MODEL_PATH
+        value: ./assets/models/pineapple_classifier/pineapple_sweetness_classifier.keras
+      - key: DETECTOR_PATH
+        value: ./assets/models/pineapple_detector
+      - key: CLASS_ORDER
+        value: High,Low,Medium
